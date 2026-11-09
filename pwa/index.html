@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e85d00">
+<title>小米舊換新估價</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: sticky search bar on top; model list left, quote card right (stacked on phones). */
+:root{
+  --bg:#f6f5f3; --surface:#ffffff; --fg:#1d1c1a; --muted:#6d6a64; --line:#e2dfd9;
+  --accent:#e85d00; --accent-fg:#ffffff; --accent-soft:#fdeadb; --good:#157347; --warn:#9a6700;
+  --font:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161513; --surface:#201f1c; --fg:#f1efea; --muted:#a09c93; --line:#34322d;
+  --accent:#ff7a29; --accent-fg:#1a0d02; --accent-soft:#3a2415; --good:#5fd08e; --warn:#e3b341; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#161513; --surface:#201f1c; --fg:#f1efea; --muted:#a09c93; --line:#34322d;
+  --accent:#ff7a29; --accent-fg:#1a0d02; --accent-soft:#3a2415; --good:#5fd08e; --warn:#e3b341; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:1040px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;font-weight:700}
+.stamp{font-size:12px;color:var(--muted)}
+.stamp b{font-family:var(--mono);font-weight:500;color:var(--fg)}
+.search{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:4px 8px;display:grid;gap:8px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+input[type=search]{width:100%;font:inherit;font-size:17px;padding:12px 14px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+input[type=search]:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:none;font:inherit;font-size:13px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--fg);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:16px;align-items:start}
+@media(max-width:760px){.main{grid-template-columns:minmax(0,1fr)}.quote{order:-1}}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.count{padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 14px;cursor:pointer}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--bg)}
+.row[aria-current=true]{background:var(--accent-soft)}
+.row .m{font-weight:500;overflow-wrap:anywhere}
+.row .b{font-size:12px;color:var(--muted)}
+.row .p{grid-row:1/3;grid-column:2;align-self:center;font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums}
+.more{display:block;width:100%;padding:12px;font:inherit;border:0;background:var(--bg);color:var(--accent);font-weight:500;cursor:pointer}
+.empty{padding:28px 14px;color:var(--muted);text-align:center}
+.quote{position:sticky;top:calc(env(safe-area-inset-top,0px) + 100px);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:14px;min-width:0}
+@media(max-width:760px){.quote{position:static}}
+.quote h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:500}
+.qm{font-size:17px;font-weight:700;overflow-wrap:anywhere;margin:0}
+.qb{font-size:12px;color:var(--muted)}
+.lines{display:grid;gap:6px}
+.ln{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.ln span:first-child{color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+.total{border-top:1.5px solid var(--fg);padding-top:12px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.total .num{font-size:32px;font-weight:700;color:var(--accent)}
+.pick{display:grid;gap:6px}
+.pick label{font-size:12px;color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.opt[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.opt small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.note{font-size:12px;color:var(--muted);margin:0}
+.warn{color:var(--warn)}
+.ph{color:var(--muted);padding:8px 0}
+.upd{display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.upd-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;padding:10px 16px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-fg);cursor:pointer}
+.btn:disabled{opacity:.6;cursor:default}
+.btn.ghost{background:var(--bg);color:var(--fg);border:1px solid var(--line);font-weight:500}
+.msg{font-size:13px;color:var(--muted)}
+.msg.ok{color:var(--good)} .msg.err{color:#c62828}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .msg.err{color:#ff8a80}}
+details.manual summary{font-size:13px;color:var(--muted);cursor:pointer}
+details.manual .f{display:grid;gap:6px;margin-top:8px;font-size:13px}
+body{padding-top:max(16px,env(safe-area-inset-top,0px))}
+</style>
+</head><body>
+
+<div class="wrap">
+  <header>
+    <h1>小米舊換新估價</h1>
+    <div class="stamp" id="stamp"></div>
+  </header>
+  <section class="upd" aria-label="更新數據">
+    <div class="upd-row">
+      <button class="btn" id="upd">更新數據</button>
+      <span class="msg" id="msg">從 Google Drive 抓取最新的兩份價目表。</span>
+    </div>
+    <details class="manual">
+      <summary>抓取失敗時，手動選擇 PDF</summary>
+      <div class="f">
+        <label>回收價 PDF <input type="file" id="fb" accept="application/pdf"></label>
+        <label>加碼金 PDF <input type="file" id="fx" accept="application/pdf"></label>
+        <button class="btn ghost" id="upm">用這兩份檔案更新</button>
+      </div>
+    </details>
+  </section>
+  <div class="search">
+    <input id="q" type="search" placeholder="輸入舊機型號，例如 iphone 14 pro 256" autocomplete="off" aria-label="搜尋舊機型號">
+    <div class="chips" id="chips" role="group" aria-label="品牌"></div>
+  </div>
+  <div class="main">
+    <div class="list">
+      <div class="count" id="count">載入資料中…</div>
+      <div id="rows"></div>
+    </div>
+    <aside class="quote" id="quote" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="config.js"></script>
+<script src="parse.js"></script>
+<script>
+(function(){
+  var DATA=null, brand="全部", sel=null, nw=-1, limit=40, results=[];
+  var $=function(i){return document.getElementById(i)};
+  var fmt=function(n){return "$"+n.toLocaleString("en-US")};
+  var norm=function(s){return s.toUpperCase().replace(/[\s_\-]+/g,"")};
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+  var KEY="tradein.data.v1";
+  function load(){
+    return fetch("data.json").then(function(r){return r.json()}).then(function(bundled){
+      var local=null; try{local=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+      return (local&&local.meta&&local.meta.updated>=bundled.meta.updated)?local:bundled;
+    });
+  }
+  function apply(d){
+    DATA=d; d.rows.forEach(function(r){r.h=norm(r.b+r.m)});
+    $("stamp").innerHTML="資料月份 <b>"+d.meta.updated+"</b>　回收價期間 <b>"+d.meta.basePeriod+"</b>"+(d.meta.fetchedAt?"　更新於 <b>"+d.meta.fetchedAt+"</b>":"");
+    var bs=["全部"]; d.rows.forEach(function(r){if(bs.indexOf(r.b)<0)bs.push(r.b)});
+    if(bs.indexOf(brand)<0)brand="全部";
+    $("chips").innerHTML=bs.map(function(b){return '<button class="chip" aria-pressed="'+(b===brand)+'" data-b="'+esc(b)+'">'+esc(b.replace(/^(紅米|小米)/,"$1 "))+'</button>'}).join("");
+    sel=null; run();
+  }
+  load().then(apply).catch(function(){$("count").textContent="資料載入失敗，請重新整理頁面。"});
+
+  function msg(t,c){var m=$("msg");m.textContent=t;m.className="msg"+(c?" "+c:"")}
+  function stamp(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
+  function driveGet(id){
+    var c=window.TRADEIN_CONFIG||{};
+    if(!c.apiKey||/請貼上/.test(c.apiKey))return Promise.reject(new Error("尚未設定 API 金鑰，請聯絡管理員，或改用下方手動選擇 PDF。"));
+    return fetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media&key="+encodeURIComponent(c.apiKey)).then(function(r){
+      if(!r.ok)throw new Error("Google Drive 回應 "+r.status+"，請確認檔案已設為「知道連結的人都能檢視」。");
+      return r.arrayBuffer();
+    });
+  }
+  function finish(res){
+    var rp=res.report, prev=DATA.rows.length;
+    if(rp.rows<100||rp.bad>5||rp.onlyBase>20)throw new Error("新檔案格式和預期不同（解析 "+rp.rows+" 筆，異常 "+rp.bad+" 筆），已保留原本的資料。請通知管理員。");
+    if(prev&&rp.rows<prev*0.7)throw new Error("新資料只有 "+rp.rows+" 筆，比原本的 "+prev+" 筆少很多，已保留原本的資料。請通知管理員。");
+    res.data.meta.fetchedAt=stamp();
+    try{localStorage.setItem(KEY,JSON.stringify(res.data))}catch(e){}
+    apply(res.data);
+    var diff=rp.rows-prev;
+    msg("已更新：共 "+rp.rows+" 款（"+(diff>=0?"+":"")+diff+"），資料月份 "+res.data.meta.updated+(rp.colsOk?"":"。加碼表頭無法辨識，沿用舊的欄位名稱，請確認"),rp.colsOk?"ok":"err");
+  }
+  function doUpdate(getBase,getBonus){
+    $("upd").disabled=true;$("upm").disabled=true;msg("更新中…");
+    return Promise.all([getBase(),getBonus()]).then(function(bufs){
+      return Promise.all([TradeInParse.readPdf(bufs[0]),TradeInParse.readPdf(bufs[1])]);
+    }).then(function(pp){finish(TradeInParse.build(pp[0],pp[1],DATA.meta.columns))})
+    .catch(function(e){msg(e.message||"更新失敗，請稍後再試。","err")})
+    .then(function(){$("upd").disabled=false;$("upm").disabled=false});
+  }
+  $("upd").addEventListener("click",function(){var c=window.TRADEIN_CONFIG||{};doUpdate(function(){return driveGet(c.baseFileId)},function(){return driveGet(c.bonusFileId)})});
+  $("upm").addEventListener("click",function(){
+    var a=$("fb").files[0],b=$("fx").files[0];
+    if(!a||!b){msg("請先選好兩份 PDF。","err");return}
+    doUpdate(function(){return a.arrayBuffer()},function(){return b.arrayBuffer()});
+  });
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+
+  $("chips").addEventListener("click",function(e){
+    var b=e.target.closest(".chip"); if(!b)return;
+    brand=b.dataset.b; limit=40;
+    Array.prototype.forEach.call($("chips").children,function(c){c.setAttribute("aria-pressed",c===b)});
+    run();
+  });
+  $("q").addEventListener("input",function(){limit=40;run()});
+
+  function run(){
+    var toks=$("q").value.trim().split(/\s+/).filter(Boolean).map(norm);
+    results=DATA.rows.filter(function(r){
+      return (brand==="全部"||r.b===brand)&&toks.every(function(t){return r.h.indexOf(t)>=0});
+    });
+    drawList(); drawQuote();
+  }
+  function drawList(){
+    $("count").textContent=results.length+" 款符合"+(results.length>limit?"，顯示前 "+limit+" 款":"");
+    if(!results.length){$("rows").innerHTML='<div class="empty">找不到這個型號。試試只輸入機型關鍵字，例如「s23」，或確認容量與型號代碼。</div>';return}
+    var h=results.slice(0,limit).map(function(r,i){
+      var cur=sel===r;
+      return '<button class="row" data-i="'+i+'" aria-current="'+cur+'"><span class="m">'+esc(r.m)+'</span><span class="b">'+esc(r.b)+'</span><span class="p">'+fmt(r.p)+'</span></button>';
+    }).join("");
+    if(results.length>limit)h+='<button class="more" id="more">顯示更多</button>';
+    $("rows").innerHTML=h;
+  }
+  $("rows").addEventListener("click",function(e){
+    if(e.target.id==="more"){limit+=60;drawList();return}
+    var b=e.target.closest(".row"); if(!b)return;
+    sel=results[+b.dataset.i]; drawList(); drawQuote();
+    if(matchMedia("(max-width:760px)").matches)window.scrollTo({top:0,behavior:"smooth"});
+  });
+
+  function drawQuote(){
+    var q=$("quote");
+    if(!sel){q.innerHTML='<h2>估算結果</h2><div class="ph">從左側選一款舊機，這裡會顯示回收價與換購新機的加碼金。</div>';return}
+    var cols=DATA.meta.columns, bonus=nw>=0?sel.x[nw]:0, hasB=nw>=0&&bonus!=null;
+    var total=sel.p+(hasB?bonus:0);
+    var opts='<button class="opt" data-n="-1" aria-pressed="'+(nw===-1)+'">不換購<small>僅回收價</small></button>'+
+      cols.map(function(c,i){var v=sel.x[i];return '<button class="opt" data-n="'+i+'" aria-pressed="'+(nw===i)+'">'+esc(c.name)+'<small>'+(v==null?"無加碼":"+"+fmt(v))+' · '+esc(c.period)+'</small></button>'}).join("");
+    q.innerHTML='<h2>估算結果</h2>'+
+      '<div><p class="qm">'+esc(sel.m)+'</p><div class="qb">'+esc(sel.b)+'</div></div>'+
+      '<div class="pick"><label>換購的新機</label><div class="opts">'+opts+'</div></div>'+
+      '<div class="lines"><div class="ln"><span>回收價（最高）</span><span class="num">'+fmt(sel.p)+'</span></div>'+
+      '<div class="ln"><span>小米加碼金'+(nw>=0?'<br><small>'+esc(cols[nw].name)+'</small>':'')+'</span><span class="num">'+(nw<0?"—":hasB?"+"+fmt(bonus):"無")+'</span></div></div>'+
+      '<div class="total"><span>預估折抵</span><span class="num">'+fmt(total)+'</span></div>'+
+      '<p class="note">回收價為「最高回收價」，實際金額以門市現場檢測為準。加碼金只在活動期間內有效。</p>';
+  }
+  $("quote").addEventListener("click",function(e){
+    var b=e.target.closest(".opt"); if(!b)return;
+    nw=+b.dataset.n; drawQuote();
+  });
+  drawQuote();
+})();
+</script>
+</body></html>
