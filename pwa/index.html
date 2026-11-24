@@ -135,7 +135,7 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
   }
   function apply(d){
     DATA=d; d.rows.forEach(function(r){r.h=norm(r.b+r.m)});
-    $("stamp").innerHTML="資料月份 <b>"+d.meta.updated+"</b>　回收價期間 <b>"+d.meta.basePeriod+"</b>"+(d.meta.fetchedAt?"　更新於 <b>"+d.meta.fetchedAt+"</b>":"");
+    $("stamp").innerHTML="資料版本 <b>"+d.meta.updated+"</b>　回收價期間 <b>"+d.meta.basePeriod+"</b>"+(d.meta.fetchedAt?"　更新於 <b>"+d.meta.fetchedAt+"</b>":"");
     var bs=["全部"]; d.rows.forEach(function(r){if(bs.indexOf(r.b)<0)bs.push(r.b)});
     if(bs.indexOf(brand)<0)brand="全部";
     $("chips").innerHTML=bs.map(function(b){return '<button class="chip" aria-pressed="'+(b===brand)+'" data-b="'+esc(b)+'">'+esc(b.replace(/^(紅米|小米)/,"$1 "))+'</button>'}).join("");
@@ -145,13 +145,27 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
 
   function msg(t,c){var m=$("msg");m.textContent=t;m.className="msg"+(c?" "+c:"")}
   function stamp(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
+  var used=[];
+  function cfg(){var c=window.TRADEIN_CONFIG||{};if(!c.apiKey||/請貼上/.test(c.apiKey))throw new Error("尚未設定 API 金鑰，請聯絡管理員，或改用下方手動選擇 PDF。");return c}
   function driveGet(id){
-    var c=window.TRADEIN_CONFIG||{};
-    if(!c.apiKey||/請貼上/.test(c.apiKey))return Promise.reject(new Error("尚未設定 API 金鑰，請聯絡管理員，或改用下方手動選擇 PDF。"));
-    return fetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media&key="+encodeURIComponent(c.apiKey)).then(function(r){
+    return fetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media&key="+encodeURIComponent(cfg().apiKey)).then(function(r){
       if(!r.ok)throw new Error("Google Drive 回應 "+r.status+"，請確認檔案已設為「知道連結的人都能檢視」。");
       return r.arrayBuffer();
     });
+  }
+  // 資料夾裡最新（修改時間最晚）的 PDF
+  function driveLatest(folderId){
+    var q="'"+folderId+"' in parents and mimeType='application/pdf' and trashed=false";
+    return fetch("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(q)+"&orderBy="+encodeURIComponent("modifiedTime desc")+"&pageSize=1&fields="+encodeURIComponent("files(id,name)")+"&key="+encodeURIComponent(cfg().apiKey)).then(function(r){
+      if(!r.ok)throw new Error("無法讀取 Drive 資料夾（"+r.status+"），請確認資料夾已設為「知道連結的人都能檢視」。");
+      return r.json();
+    }).then(function(j){
+      if(!j.files||!j.files.length)throw new Error("資料夾裡找不到 PDF 檔案。");
+      used.push(j.files[0].name);return j.files[0].id;
+    });
+  }
+  function pick(folderId,fileId){
+    return Promise.resolve().then(function(){return folderId?driveLatest(folderId):fileId}).then(driveGet);
   }
   function finish(res){
     var rp=res.report, prev=DATA.rows.length;
@@ -161,7 +175,9 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
     try{localStorage.setItem(KEY,JSON.stringify(res.data))}catch(e){}
     apply(res.data);
     var diff=rp.rows-prev;
-    msg("已更新：共 "+rp.rows+" 款（"+(diff>=0?"+":"")+diff+"），資料月份 "+res.data.meta.updated+(rp.colsOk?"":"。加碼表頭無法辨識，沿用舊的欄位名稱，請確認"),rp.colsOk?"ok":"err");
+    var m=res.data.meta, bp=(m.basePeriod||"").replace("–","～"), seen=[];
+    m.columns.forEach(function(c){var p=(c.period||"").replace("–","～");if(p&&seen.indexOf(p)<0)seen.push(p)});
+    msg("已更新至 "+bp+" 這一期（共 "+rp.rows+" 款，"+(diff>=0?"+":"")+diff+"）。加碼金期間："+(seen.join("、")||"未標示")+(used.length?"。使用檔案："+used.join("、"):"")+(rp.colsOk?"":"。加碼表頭無法辨識，欄位名稱請確認"),rp.colsOk?"ok":"err");
   }
   function doUpdate(getBase,getBonus){
     $("upd").disabled=true;$("upm").disabled=true;msg("更新中…");
@@ -171,11 +187,11 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
     .catch(function(e){msg(e.message||"更新失敗，請稍後再試。","err")})
     .then(function(){$("upd").disabled=false;$("upm").disabled=false});
   }
-  $("upd").addEventListener("click",function(){var c=window.TRADEIN_CONFIG||{};doUpdate(function(){return driveGet(c.baseFileId)},function(){return driveGet(c.bonusFileId)})});
+  $("upd").addEventListener("click",function(){var c=window.TRADEIN_CONFIG||{};used=[];doUpdate(function(){return pick(c.baseFolderId,c.baseFileId)},function(){return pick(c.bonusFolderId,c.bonusFileId)})});
   $("upm").addEventListener("click",function(){
     var a=$("fb").files[0],b=$("fx").files[0];
     if(!a||!b){msg("請先選好兩份 PDF。","err");return}
-    doUpdate(function(){return a.arrayBuffer()},function(){return b.arrayBuffer()});
+    used=[];doUpdate(function(){return a.arrayBuffer()},function(){return b.arrayBuffer()});
   });
   if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
 
@@ -214,10 +230,10 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
   function drawQuote(){
     var q=$("quote");
     if(!sel){q.innerHTML='<h2>估算結果</h2><div class="ph">從左側選一款舊機，這裡會顯示回收價與換購新機的加碼金。</div>';return}
-    var cols=DATA.meta.columns, bonus=nw>=0?sel.x[nw]:0, hasB=nw>=0&&bonus!=null;
+    var cols=DATA.meta.columns, sx=sel.x||[], bonus=nw>=0?sx[nw]:0, hasB=nw>=0&&bonus!=null;
     var total=sel.p+(hasB?bonus:0);
     var opts='<button class="opt" data-n="-1" aria-pressed="'+(nw===-1)+'">不換購<small>僅回收價</small></button>'+
-      cols.map(function(c,i){var v=sel.x[i];return '<button class="opt" data-n="'+i+'" aria-pressed="'+(nw===i)+'">'+esc(c.name)+'<small>'+(v==null?"無加碼":"+"+fmt(v))+' · '+esc(c.period)+'</small></button>'}).join("");
+      cols.map(function(c,i){var v=sx[i];return '<button class="opt" data-n="'+i+'" aria-pressed="'+(nw===i)+'">'+esc(c.name)+'<small>'+(v==null?"無加碼":"+"+fmt(v))+' · '+esc(c.period)+'</small></button>'}).join("");
     q.innerHTML='<h2>估算結果</h2>'+
       '<div><p class="qm">'+esc(sel.m)+'</p><div class="qb">'+esc(sel.b)+'</div></div>'+
       '<div class="pick"><label>換購的新機</label><div class="opts">'+opts+'</div></div>'+
