@@ -2,6 +2,8 @@
 window.TRADEIN_CONFIG = {
   // Google Cloud 建立的 API 金鑰（限制只能呼叫 Drive API，並限制網站來源）
   apiKey: "AIzaSyCKCjBPd4jfhIOUohskXC_35u3w6ZE2u5A",
+  baseFolderId: "13fc_cKokUyXNI6FzFvFxex-OINZBZ0Iz",
+  bonusFolderId: "1PcZAF2Y4z7u7NL-HgP8JNxuYggojTwSU", 
   // 兩份 PDF 的 Google Drive 檔案 ID（網址 /d/ 和 /view 中間那一段）
   baseFileId: "10ha7OpmLX70QoHrjS1L8tvEYCMR9d1o8",   // 回收價
   bonusFileId: "16_DOtzXhJ4zC2SwLp3FF-znqhXi9xcFf"   // 加碼金
