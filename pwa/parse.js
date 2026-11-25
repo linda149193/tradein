@@ -67,10 +67,14 @@
     var m = /\((\d{2})(\d{2})-(\d{2})(\d{2})\)/.exec(s);
     return m ? mmdd(m[1], m[2], m[3], m[4]) : '';
   }
-  // 檔頭沒有年份時，用今天的日期推算（期間開始月份比現在晚超過半年，視為去年）
-  function guessYear(mm) {
-    var now = new Date(), y = now.getFullYear();
-    return (+mm > now.getMonth() + 1 + 6) ? y - 1 : y;
+  // 檔頭沒有年份時：在「去年、今年、明年」之中，挑最接近今天的那一年
+  function nearestYear(mm, dd) {
+    var now = new Date(), best = now.getFullYear(), bd = 1e18;
+    [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].forEach(function (y) {
+      var diff = Math.abs(new Date(y, +mm - 1, +dd) - now);
+      if (diff < bd) { bd = diff; best = y; }
+    });
+    return best;
   }
 
   function parseBase(pages) {
@@ -85,7 +89,7 @@
     });
     var updated = '', per = '';
     if (head) {
-      var y = head[1] || guessYear(head[2]);
+      var y = head[1] || nearestYear(head[2], head[3]);
       updated = y + '-' + head[2] + '-' + head[3];   // 期間開始日，當作資料版本
       per = mmdd(head[2], head[3], head[4], head[5]);
     }
@@ -186,6 +190,21 @@
     };
   }
 
+  // 這份 PDF 的生效起始日（讀不到回傳 null）
+  function startOf(pages, kind) {
+    if (kind === 'base') {
+      var b = parseBase(pages); if (!b.updated) return null;
+      var p = b.updated.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]);
+    }
+    var x = parseBonus(pages); if (!x.cols) return null;
+    var best = null;
+    x.cols.forEach(function (c) {
+      var m = /^(\d{2})\/(\d{2})/.exec(c.period || '');
+      if (m) { var d = new Date(nearestYear(m[1], m[2]), +m[1] - 1, +m[2]); if (!best || d < best) best = d; }
+    });
+    return best;
+  }
+
   function readFile(file) { return file.arrayBuffer(); }
-  window.TradeInParse = { readPdf: readPdf, build: build, readFile: readFile };
+  window.TradeInParse = { readPdf: readPdf, build: build, readFile: readFile, startOf: startOf };
 })();

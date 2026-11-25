@@ -145,7 +145,7 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
 
   function msg(t,c){var m=$("msg");m.textContent=t;m.className="msg"+(c?" "+c:"")}
   function stamp(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
-  var used=[];
+  var used=[],skippedAll=[];
   function cfg(){var c=window.TRADEIN_CONFIG||{};if(!c.apiKey||/請貼上/.test(c.apiKey))throw new Error("尚未設定 API 金鑰，請聯絡管理員，或改用下方手動選擇 PDF。");return c}
   function driveGet(id){
     return fetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media&key="+encodeURIComponent(cfg().apiKey)).then(function(r){
@@ -153,19 +153,43 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
       return r.arrayBuffer();
     });
   }
-  // 資料夾裡最新（修改時間最晚）的 PDF
-  function driveLatest(folderId){
-    var q="'"+folderId+"' in parents and mimeType='application/pdf' and trashed=false";
-    return fetch("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(q)+"&orderBy="+encodeURIComponent("modifiedTime desc")+"&pageSize=1&fields="+encodeURIComponent("files(id,name)")+"&key="+encodeURIComponent(cfg().apiKey)).then(function(r){
-      if(!r.ok)throw new Error("無法讀取 Drive 資料夾（"+r.status+"），請確認資料夾已設為「知道連結的人都能檢視」。");
-      return r.json();
-    }).then(function(j){
-      if(!j.files||!j.files.length)throw new Error("資料夾裡找不到 PDF 檔案。");
-      used.push(j.files[0].name);return j.files[0].id;
+  // 資料夾（含年度子資料夾，例如 2026、2027）裡最近修改的幾份 PDF
+  function listPdfs(folderId){
+    var key=cfg().apiKey;
+    function list(q){
+      return fetch("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(q)+"&orderBy="+encodeURIComponent("modifiedTime desc")+"&pageSize=100&fields="+encodeURIComponent("files(id,name,mimeType,modifiedTime)")+"&key="+encodeURIComponent(key)).then(function(r){
+        if(!r.ok)throw new Error("無法讀取 Drive 資料夾（"+r.status+"），請確認資料夾已設為「知道連結的人都能檢視」。");
+        return r.json();
+      }).then(function(j){return j.files||[]});
+    }
+    return list("'"+folderId+"' in parents and trashed=false and (mimeType='application/pdf' or mimeType='application/vnd.google-apps.folder')").then(function(top){
+      var pdfs=top.filter(function(f){return f.mimeType==="application/pdf"});
+      var subs=top.filter(function(f){return f.mimeType!=="application/pdf"}).sort(function(a,b){return a.name<b.name?1:-1}).slice(0,3);
+      return Promise.all(subs.map(function(f){return list("'"+f.id+"' in parents and trashed=false and mimeType='application/pdf'")})).then(function(rs){
+        rs.forEach(function(r){pdfs=pdfs.concat(r)});
+        pdfs.sort(function(a,b){return a.modifiedTime<b.modifiedTime?1:-1});
+        return pdfs.slice(0,4);
+      });
     });
   }
-  function pick(folderId,fileId){
-    return Promise.resolve().then(function(){return folderId?driveLatest(folderId):fileId}).then(driveGet);
+  // 從最新的檔案開始找，挑第一份「已經到生效日」的
+  function pick(kind,folderId,fileId){
+    if(!folderId)return driveGet(fileId);
+    return listPdfs(folderId).then(function(c){
+      if(!c.length)throw new Error("資料夾裡找不到 PDF 檔案。");
+      var today=new Date();
+      function tryAt(i){
+        if(i>=c.length)throw new Error("找不到已生效的檔案，最新的檔案都還沒到生效日。");
+        return driveGet(c[i].id).then(function(buf){
+          return TradeInParse.readPdf(buf.slice(0)).then(function(pages){
+            var st=TradeInParse.startOf(pages,kind);
+            if(st&&st>today){skippedAll.push(c[i].name+"（"+(st.getMonth()+1)+"/"+st.getDate()+" 起）");return tryAt(i+1)}
+            used.push(c[i].name);return buf;
+          });
+        });
+      }
+      return tryAt(0);
+    });
   }
   function finish(res){
     var rp=res.report, prev=DATA.rows.length;
@@ -177,7 +201,7 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
     var diff=rp.rows-prev;
     var m=res.data.meta, bp=(m.basePeriod||"").replace("–","～"), seen=[];
     m.columns.forEach(function(c){var p=(c.period||"").replace("–","～");if(p&&seen.indexOf(p)<0)seen.push(p)});
-    msg("已更新至 "+bp+" 這一期（共 "+rp.rows+" 款，"+(diff>=0?"+":"")+diff+"）。加碼金期間："+(seen.join("、")||"未標示")+(used.length?"。使用檔案："+used.join("、"):"")+(rp.colsOk?"":"。加碼表頭無法辨識，欄位名稱請確認"),rp.colsOk?"ok":"err");
+    msg("已更新至 "+bp+" 這一期（共 "+rp.rows+" 款，"+(diff>=0?"+":"")+diff+"）。加碼金期間："+(seen.join("、")||"未標示")+(used.length?"。使用檔案："+used.join("、"):"")+(skippedAll.length?"。尚未生效、已略過："+skippedAll.join("、"):"")+(rp.colsOk?"":"。加碼表頭無法辨識，欄位名稱請確認"),rp.colsOk?"ok":"err");
   }
   function doUpdate(getBase,getBonus){
     $("upd").disabled=true;$("upm").disabled=true;msg("更新中…");
@@ -187,11 +211,11 @@ body{padding-top:max(16px,env(safe-area-inset-top,0px))}
     .catch(function(e){msg(e.message||"更新失敗，請稍後再試。","err")})
     .then(function(){$("upd").disabled=false;$("upm").disabled=false});
   }
-  $("upd").addEventListener("click",function(){var c=window.TRADEIN_CONFIG||{};used=[];doUpdate(function(){return pick(c.baseFolderId,c.baseFileId)},function(){return pick(c.bonusFolderId,c.bonusFileId)})});
+  $("upd").addEventListener("click",function(){var c=window.TRADEIN_CONFIG||{};used=[];skippedAll=[];doUpdate(function(){return pick("base",c.baseFolderId,c.baseFileId)},function(){return pick("bonus",c.bonusFolderId,c.bonusFileId)})});
   $("upm").addEventListener("click",function(){
     var a=$("fb").files[0],b=$("fx").files[0];
     if(!a||!b){msg("請先選好兩份 PDF。","err");return}
-    used=[];doUpdate(function(){return a.arrayBuffer()},function(){return b.arrayBuffer()});
+    used=[];skippedAll=[];doUpdate(function(){return a.arrayBuffer()},function(){return b.arrayBuffer()});
   });
   if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
 
